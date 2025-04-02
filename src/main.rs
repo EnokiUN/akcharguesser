@@ -1,7 +1,7 @@
 mod fetch_char_data;
 mod util;
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use fetch_char_data::{load_skin_data, SkinData};
 use image::load_from_memory;
 use rand::{seq::IndexedRandom, Rng};
@@ -11,7 +11,9 @@ use std::{
     env,
     io::{BufWriter, Cursor},
     sync::Arc,
+    time::Duration,
 };
+use tokio::time::timeout;
 use twilight_cache_inmemory::{DefaultInMemoryCache, ResourceType};
 use twilight_gateway::{Event, EventTypeFlags, Intents, Shard, ShardId, StreamExt as _};
 use twilight_http::Client as HttpClient;
@@ -131,15 +133,23 @@ async fn handle_event(
                 )])
                 .await?;
             let answer = skin.model_name.clone();
-            let response = standby
-                .wait_for_message(msg.channel_id, move |e: &MessageCreate| {
-                    normalise_name(&e.content) == answer
-                })
-                .await?;
-            http.create_message(msg.channel_id)
-                .reply(response.id)
-                .content(":tada:")
-                .await?;
+            let future = standby.wait_for_message(msg.channel_id, move |e: &MessageCreate| {
+                normalise_name(&e.content) == answer
+            });
+            match timeout(Duration::from_secs(30), future).await {
+                Ok(response) => {
+                    http.create_message(msg.channel_id)
+                        .reply(response?.id)
+                        .content(":tada:")
+                        .await?
+                }
+                Err(_) => {
+                    http.create_message(msg.channel_id)
+                        .reply(reply.id)
+                        .content(&format!("It's [{}]({})", skin.model_name, url.as_str()))
+                        .await?
+                }
+            };
         }
         _ => {}
     }
