@@ -106,24 +106,36 @@ async fn handle_event(
                 "yuanyan3060/ArknightsGameResource/refs/heads/main/skin/{}b.png",
                 skin.skin_id
             ));
-            let image = http_client.get(url).send().await?.bytes().await?;
-            let cropped = tokio::task::spawn_blocking(move || {
-                let mut image = load_from_memory(&image).expect("Couldn't parse image");
+            let image = http_client.get(url.clone()).send().await?.bytes().await?;
+            let cropped = match tokio::task::spawn_blocking(move || {
+                let mut image = load_from_memory(&image).context("Couldn't parse image")?;
                 let mut rng = rand::rng();
-                let width = min(image.width() / 4, 500);
-                let x = rng.random_range((width / 2)..(image.width() - width));
-                let y = rng.random_range((width / 2)..(image.height() - width));
+                let width = min(image.width() / 5, 500);
+                let height = min(image.height() / 5, 500);
+                let x = rng.random_range((width / 2)..(image.width() - width - width / 2));
+                let y = rng.random_range(0..(image.height() - height));
                 let cropped = image.crop(x, y, x + width, y + width);
                 let mut bytes: Cursor<Vec<u8>> = Cursor::new(vec![]);
                 {
                     let mut writer = BufWriter::new(&mut bytes);
                     cropped
                         .write_to(&mut writer, image::ImageFormat::Png)
-                        .expect("Couldn't write image result to buffer");
+                        .context("Couldn't write image result to buffer")?;
                 }
-                bytes.into_inner()
+                anyhow::Ok(bytes.into_inner())
             })
-            .await?;
+            .await?
+            {
+                Ok(cropped) => Ok(cropped),
+                Err(err) => {
+                    log::warn!("Failed to crop {}, {}", skin.skin_id, err);
+                    http.create_message(msg.channel_id)
+                        .reply(reply.id)
+                        .content("Error happened X(")
+                        .await?;
+                    Err(err)
+                }
+            }?;
             http.update_message(reply.channel_id, reply.id)
                 .content(Some("Guess who this is!"))
                 .attachments(&[Attachment::from_bytes(
