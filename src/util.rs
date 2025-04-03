@@ -6,6 +6,7 @@ pub fn normalise_name(name: &str) -> String {
         "лето" => "leto".to_string(),
         "роса" => "rosa".to_string(),
         "позёмка" => "pozemka".to_string(),
+        "eyjafjallathehvítaska" => "eyjafjallathehvitaska".to_string(),
         name => name
             .replace(' ', "")
             .replace('-', "")
