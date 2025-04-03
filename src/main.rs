@@ -147,20 +147,33 @@ async fn handle_event(
             let answer = skin.model_name.clone();
             let future = standby.wait_for_message(msg.channel_id, move |e: &MessageCreate| {
                 normalise_name(&e.content) == answer
+                    || (e.content == "e!skip" && msg.author.id == e.author.id)
             });
             match timeout(Duration::from_secs(30), future).await {
-                Ok(response) => {
-                    http.create_message(msg.channel_id)
-                        .reply(response?.id)
-                        .content(":tada:")
-                        .await?
+                Ok(Ok(response)) => {
+                    if response.content == "e!skip" {
+                        http.create_message(reply.channel_id)
+                            .reply(reply.id)
+                            .content(&format!(
+                                "[Skipped] It's [{}]({})",
+                                skin.model_name,
+                                url.as_str()
+                            ))
+                            .await?
+                    } else {
+                        http.create_message(reply.channel_id)
+                            .reply(response.id)
+                            .content(":tada:")
+                            .await?
+                    }
                 }
                 Err(_) => {
-                    http.create_message(msg.channel_id)
+                    http.create_message(reply.channel_id)
                         .reply(reply.id)
                         .content(&format!("It's [{}]({})", skin.model_name, url.as_str()))
                         .await?
                 }
+                _ => unreachable!(),
             };
         }
         _ => {}
