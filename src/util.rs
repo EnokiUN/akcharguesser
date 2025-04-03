@@ -1,5 +1,14 @@
 pub fn normalise_name(name: &str) -> String {
-    match name.to_lowercase().as_str() {
+    match name
+        .to_lowercase()
+        .replace(' ', "")
+        .replace('-', "")
+        .replace('\'', "")
+        .replace('ł', "l")
+        .replace('š', "s")
+        .replace('"', "")
+        .as_str()
+    {
         "истина" => "istina".to_string(),
         "зима" => "zima".to_string(),
         "гум" => "gummy".to_string(),
@@ -7,12 +16,6 @@ pub fn normalise_name(name: &str) -> String {
         "роса" => "rosa".to_string(),
         "позёмка" => "pozemka".to_string(),
         "eyjafjallathehvítaska" => "eyjafjallathehvitaska".to_string(),
-        name => name
-            .replace(' ', "")
-            .replace('-', "")
-            .replace('\'', "")
-            .replace('ł', "l")
-            .replace('š', "s")
-            .replace('"', ""),
+        name => name.to_string(),
     }
 }
